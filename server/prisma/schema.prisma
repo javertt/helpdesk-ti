@@ -1,0 +1,95 @@
+generator client {
+  provider   = "prisma-client-js"
+  engineType = "client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum TicketCategory {
+  REDE
+  HARDWARE
+  SOFTWARE
+  ACESSOS
+  OUTRO
+}
+
+enum TicketPriority {
+  BAIXA
+  MEDIA
+  URGENTE
+}
+
+enum TicketStatus {
+  ABERTO
+  EM_ANDAMENTO
+  RESOLVIDO
+}
+
+model User {
+  id                String         @id @default(cuid())
+  name              String
+  email             String         @unique
+  passwordHash      String
+  role              Role           @default(USER)
+  department        String         @default("")
+  createdAt         DateTime       @default(now())
+  requestedTickets  Ticket[]       @relation("Requester")
+  assignedTickets   Ticket[]       @relation("Assignee")
+  messages          TicketMessage[]
+  history           TicketHistory[]
+}
+
+model Ticket {
+  id          Int             @id @default(autoincrement())
+  title       String
+  description String          @db.Text
+  category    TicketCategory
+  priority    TicketPriority  @default(MEDIA)
+  status      TicketStatus    @default(ABERTO)
+  solution    String          @default("") @db.Text
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  resolvedAt  DateTime?
+  requesterId String
+  assigneeId  String?
+  requester   User            @relation("Requester", fields: [requesterId], references: [id])
+  assignee    User?           @relation("Assignee", fields: [assigneeId], references: [id])
+  messages    TicketMessage[]
+  history     TicketHistory[]
+
+  @@index([status, createdAt])
+  @@index([requesterId, createdAt])
+  @@index([priority, category])
+}
+
+model TicketMessage {
+  id        String   @id @default(cuid())
+  body      String   @db.Text
+  createdAt DateTime @default(now())
+  ticketId  Int
+  authorId  String
+  ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  author    User     @relation(fields: [authorId], references: [id])
+
+  @@index([ticketId, createdAt])
+}
+
+model TicketHistory {
+  id        String   @id @default(cuid())
+  action    String
+  createdAt DateTime @default(now())
+  ticketId  Int
+  actorId   String
+  ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  actor     User     @relation(fields: [actorId], references: [id])
+
+  @@index([ticketId, createdAt])
+}

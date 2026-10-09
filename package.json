@@ -1,0 +1,23 @@
+{
+  "name": "helpdesk-ti",
+  "private": true,
+  "version": "1.0.0",
+  "workspaces": [
+    "client",
+    "server"
+  ],
+  "scripts": {
+    "dev": "concurrently -n WEB,API -c cyan,magenta \"npm run dev -w client\" \"npm run dev -w server\"",
+    "dev:web": "npm run dev -w client",
+    "dev:api": "npm run dev -w server",
+    "build": "npm run build -w client",
+    "db:migrate": "npm run db:migrate -w server",
+    "db:seed": "npm run db:seed -w server",
+    "format": "prettier --write \"client/src/**/*.{js,jsx,css}\" \"client/*.{js,json,html}\" \"server/src/**/*.js\" \"server/prisma/**/*.js\" \"server/*.{json,ts}\" package.json README.md",
+    "format:check": "prettier --check \"client/src/**/*.{js,jsx,css}\" \"client/*.{js,json,html}\" \"server/src/**/*.js\" \"server/prisma/**/*.js\" \"server/*.{json,ts}\" package.json README.md"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "prettier": "^3.9.9"
+  }
+}

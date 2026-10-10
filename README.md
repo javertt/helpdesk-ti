@@ -7,7 +7,15 @@ Sistema de abertura e acompanhamento de chamados para equipes de suporte técnic
 - **Web:** React, Vite, Tailwind CSS, React Router e Lucide.
 - **API:** Node.js, Express, JWT, bcrypt e Zod.
 - **Dados:** PostgreSQL com Prisma ORM.
-- **Publicação gratuita:** GitHub + Cloudflare Workers (web e API) + Supabase Postgres. Não usa R2 nem Durable Objects.
+- **Publicação gratuita:** GitHub + Cloudflare Workers (web e API) + Cloudflare Hyperdrive + Supabase Postgres. Não usa R2 nem Durable Objects.
+
+## Demonstração publicada
+
+- **Aplicação:** https://helpdesk-ti-web.samy-vgomes.workers.dev
+- **API:** https://helpdesk-ti-api.samy-vgomes.workers.dev/api/health
+- **Código:** https://github.com/javertt/helpdesk-ti (repositório privado)
+
+A interface publicada está conectada à API e ao banco Supabase, com quatro contas fictícias e oito chamados de demonstração. Para entrar como administrador, use `admin@helpdesk.demo` e a senha `SEED_ADMIN_PASSWORD` definida no arquivo local `server/.env`. A senha não fica no repositório.
 
 ## Funcionalidades
 
@@ -56,7 +64,7 @@ Para restaurar a demonstração, limpe o armazenamento local do site no navegado
 
 ## Rodar com PostgreSQL e API
 
-1. Crie um projeto no [Supabase](https://supabase.com/dashboard) ou um banco PostgreSQL local. No Supabase, copie as conexões **Session pooler** (porta 5432, para migrations) e **Transaction pooler** (porta 6543, para a API no Worker) no menu `Connect`. Veja a [documentação de conexões](https://supabase.com/docs/guides/database/connecting-to-postgres). Guarde a senha do banco somente no servidor.
+1. Crie um projeto no [Supabase](https://supabase.com/dashboard) ou um banco PostgreSQL local. No Supabase, copie as conexões **Session pooler** (porta 5432, para migrations), **Transaction pooler** (porta 6543, para a API Node local) e **Direct connection** (para o Hyperdrive) no menu `Connect`. Veja a [documentação de conexões](https://supabase.com/docs/guides/database/connecting-to-postgres). Guarde a senha do banco somente no servidor.
 2. Copie `server/.env.example` para `server/.env` e preencha `MIGRATION_URL` com a conexão Session pooler, `DATABASE_URL` com a Transaction pooler, `JWT_SECRET` (32 caracteres ou mais), `SEED_ADMIN_PASSWORD` e `SEED_USER_PASSWORD` com valores próprios. Para PostgreSQL local, `MIGRATION_URL` e `DATABASE_URL` podem ser iguais. As senhas do seed precisam ter 12 caracteres ou mais.
 
    No Supabase, acrescente `?schema=public&sslmode=require` à conexão de sessão. Para a conexão de transação usada pelo driver `pg`, use `?schema=public&pgbouncer=true&sslmode=require&uselibpqcompat=true`. O parâmetro de compatibilidade mantém o TLS obrigatório no `pg` com a semântica de `sslmode=require` do PostgreSQL.
@@ -100,14 +108,33 @@ Use `Authorization: Bearer <token>` nas rotas autenticadas. O JWT expira em 8 ho
 
 ## Publicar com GitHub, Cloudflare e Supabase
 
-Este projeto usa **dois Cloudflare Workers** para manter React/Vite e Express sem contratar servidor: `helpdesk-ti-web` serve os arquivos estáticos; `helpdesk-ti-api` executa a API Express. A documentação da Cloudflare descreve [Express em Workers](https://developers.cloudflare.com/workers/tutorials/deploy-an-express-app/) e [assets estáticos para SPA](https://developers.cloudflare.com/workers/static-assets/). O Prisma usa o [driver `pg` com `nodejs_compat`](https://www.prisma.io/docs/orm/v6/prisma-client/deployment/edge/deploy-to-cloudflare), conectado ao PostgreSQL do Supabase.
+Este projeto usa **dois Cloudflare Workers**: `helpdesk-ti-web` serve os arquivos estáticos do React/Vite; `helpdesk-ti-api` executa a API Express. O Worker da API acessa o PostgreSQL do Supabase pelo **Hyperdrive**, com o [driver `pg` do Prisma e `nodejs_compat`](https://www.prisma.io/docs/orm/v6/prisma-client/deployment/edge/deploy-to-cloudflare). Veja também a documentação de [Express em Workers](https://developers.cloudflare.com/workers/tutorials/deploy-an-express-app/), [assets para SPA](https://developers.cloudflare.com/workers/static-assets/) e [preços do Hyperdrive](https://developers.cloudflare.com/hyperdrive/platform/pricing/).
 
-1. Crie um **novo projeto Supabase** para o HelpDesk. Não reutilize o banco do Linktree. Preencha `MIGRATION_URL` com a URI do **Session pooler**, execute `npm run db:deploy -w server` no computador e rode o seed apenas se quiser dados fictícios publicados. Use a URI do **Transaction pooler** como `DATABASE_URL` no Worker da API.
-2. Envie este repositório ao GitHub. Os arquivos `.env` ficam fora do Git.
-3. Na Cloudflare, crie um Worker a partir do repositório para a API. Configure o diretório `server`, o comando de build `npm install && npm run db:generate -w server` (executado na raiz do repositório, conforme a opção de root directory do projeto) e o comando de deploy `npm run deploy -w server`. Se o painel executar comandos dentro de `server`, use `npm install` / `npm run db:generate` / `npm run deploy` nesse diretório.
-4. Defina os **secrets** da API: `DATABASE_URL`, `JWT_SECRET` e `CLIENT_URL` (a URL pública do Worker web, sem barra final). `DATABASE_URL` e `JWT_SECRET` nunca devem ir para variáveis `VITE_`.
-5. Crie outro Worker a partir do mesmo repositório para o front-end. Configure build `npm install && npm run build -w client` e deploy `npm run deploy -w client` na raiz (ou os equivalentes no diretório `client`). Defina `VITE_API_URL=https://SEU-WORKER-API.workers.dev/api` **como variável de build** antes de compilar.
-6. Atualize `CLIENT_URL` no Worker da API com a URL definitiva da web. Teste cadastro, login e um chamado no endereço público.
+1. Crie um projeto Supabase separado. Preencha `server/.env` conforme `server/.env.example`, execute `npm run db:deploy -w server` no computador e rode `npm run db:seed` para incluir os dados fictícios.
+2. Envie o código ao GitHub. Os arquivos `.env` e `.dev.vars` ficam fora do Git.
+3. No Cloudflare, crie um Hyperdrive com a URI **Direct connection** do Supabase:
+
+   ```bash
+   npx wrangler hyperdrive create helpdesk-ti-db --connection-string="postgresql://..." --caching-disabled
+   ```
+
+   O comando salva a credencial na Cloudflare. Copie o `id` retornado para o binding `HYPERDRIVE` em `server/wrangler.jsonc`. O ID presente neste repositório pertence ao projeto publicado; use outro ID se criar seu próprio projeto. A conexão é lida dentro da requisição do Worker, como exigido pelo ambiente Cloudflare.
+
+4. Crie os secrets da API no Worker `helpdesk-ti-api`: `JWT_SECRET` e `CLIENT_URL` (URL pública do Worker web, sem barra final). O `DATABASE_URL` é usado no Node local; no Worker, o binding `HYPERDRIVE` fornece a conexão. Publique a API:
+
+   ```bash
+   npm run db:generate -w server
+   npm run deploy -w server
+   ```
+
+5. Crie `client/.env` com `VITE_API_URL=https://SEU-WORKER-API.workers.dev/api`. Essa variável é incorporada durante o build. Publique o front-end:
+
+   ```bash
+   npm run build -w client
+   npm run deploy -w client
+   ```
+
+6. Confirme `CLIENT_URL` no Worker da API com a URL definitiva da web. Teste `/api/health`, login, listagem de chamados e a aplicação no navegador.
 
 O front-end sem `VITE_API_URL` continua em modo demo mesmo quando publicado. O `JWT_SECRET` deve ser único e imprevisível. Não publique `.env`, senhas nem a string de conexão no GitHub. Os planos gratuitos têm limites de uso que podem mudar; confirme os limites atuais nos painéis dos provedores antes de aumentar o tráfego.
 

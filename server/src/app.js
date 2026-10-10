@@ -115,8 +115,10 @@ export function createApp({ databaseUrl, jwtSecret, clientUrl }) {
 
   app.get('/api/health', (_req, res) => res.json({ status: 'ok', service: 'helpdesk-ti-api' }))
   app.use((req, res, next) => {
+    const connectionString = typeof databaseUrl === 'function' ? databaseUrl() : databaseUrl
+    if (!connectionString) return next(new Error('DATABASE_URL ausente.'))
     const db = new PrismaClient({
-      adapter: new PrismaPg({ connectionString: databaseUrl, max: 1 }),
+      adapter: new PrismaPg({ connectionString, max: 1 }),
     })
     req.db = db
     let closed = false

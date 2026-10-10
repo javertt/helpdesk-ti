@@ -4,5 +4,6 @@
   "workers_dev": true,
   "compatibility_date": "2026-10-09",
   "compatibility_flags": ["nodejs_compat"],
-  "observability": { "enabled": true }
+  "observability": { "enabled": true },
+  "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "90ab3ac730174b10a2a9bc858d9f0711" }],
 }

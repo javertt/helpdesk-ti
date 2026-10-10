@@ -1,11 +1,22 @@
 import { demoTickets, demoUsers } from '../data/demo'
 
 const API_URL = import.meta.env.VITE_API_URL?.replace(/\/$/, '')
-export const isDemo = !API_URL
+const demoModeKey = 'helpdesk.demo.mode'
+const demoQuery = new URLSearchParams(window.location.search).get('demo')
+let savedDemoMode = false
+try {
+  if (demoQuery === '1') sessionStorage.setItem(demoModeKey, '1')
+  if (demoQuery === '0') sessionStorage.removeItem(demoModeKey)
+  savedDemoMode = sessionStorage.getItem(demoModeKey) === '1'
+} catch {
+  // O modo normal continua disponível quando o armazenamento da sessão está desativado.
+}
+export const hasLiveApi = Boolean(API_URL)
+export const isDemo = !hasLiveApi || demoQuery === '1' || (demoQuery !== '0' && savedDemoMode)
 const K = {
   users: 'helpdesk.demo.users',
   tickets: 'helpdesk.demo.tickets',
-  session: 'helpdesk.session',
+  session: isDemo ? 'helpdesk.demo.session' : 'helpdesk.session',
 }
 const read = (key, fallback) => {
   try {

@@ -373,6 +373,13 @@ button:disabled {
   gap: 7px;
   width: max-content;
   max-width: 100%;
+  flex-wrap: wrap;
+}
+.demo-banner a {
+  color: #57439d;
+  margin-left: auto;
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 .demo-banner-muted {
   font-weight: 500;
@@ -895,6 +902,15 @@ button:disabled {
   display: flex;
   align-items: center;
   gap: 5px;
+}
+.app-footer a,
+.auth-form-footer a {
+  color: #7868bd;
+  font-weight: 700;
+}
+.app-footer a:hover,
+.auth-form-footer a:hover {
+  text-decoration: underline;
 }
 .list-panel {
   overflow: hidden;
@@ -1832,6 +1848,10 @@ textarea::placeholder {
   color: #adb4c0;
   font-size: 10px;
   padding: 0 24px 23px;
+}
+.auth-form-footer a {
+  display: block;
+  margin-top: 7px;
 }
 .auth-mobile-logo {
   display: none;

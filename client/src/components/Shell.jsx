@@ -18,7 +18,7 @@ import {
   UserRound,
 } from 'lucide-react'
 import { Avatar } from './UI'
-import { isDemo } from '../lib/api'
+import { hasLiveApi, isDemo } from '../lib/api'
 
 const nav = [
   { to: '/', label: 'Painel', icon: LayoutDashboard, admin: true },
@@ -176,12 +176,20 @@ export default function Shell({ user, onLogout, children }) {
               <span className="demo-banner-muted">
                 · Os dados são fictícios e ficam salvos neste navegador.
               </span>
+              {hasLiveApi && <a href="/login?demo=0">Usar sistema online</a>}
             </div>
           )}
           {children}
         </main>
         <footer className="app-footer">
           <span>© {new Date().getFullYear()} HelpDesk TI</span>
+          <a
+            href="https://linktree.samy-vgomes.workers.dev/javertt"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Voltar ao portfólio
+          </a>
           <span>
             Feito para simplificar o suporte <CircleHelp size={14} />
           </span>

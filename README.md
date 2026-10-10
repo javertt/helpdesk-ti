@@ -17,6 +17,8 @@ Sistema de abertura e acompanhamento de chamados para equipes de suporte técnic
 
 A interface publicada está conectada à API e ao banco Supabase, com quatro contas fictícias e oito chamados de demonstração. Para entrar como administrador, use `admin@helpdesk.demo` e a senha `SEED_ADMIN_PASSWORD` definida no arquivo local `server/.env`. A senha não fica no repositório.
 
+Para apresentar o projeto sem compartilhar credenciais do banco, abra a [demonstração interativa](https://helpdesk-ti-web.samy-vgomes.workers.dev/login?demo=1). Ela usa os usuários e chamados fictícios no armazenamento do navegador, com acesso de administrador ou colaborador. O botão **Usar sistema online** retorna ao ambiente conectado à API. As sessões dos dois modos são separadas. O [portfólio Pop Cult](https://linktree.samy-vgomes.workers.dev/javertt) apresenta o projeto e oferece os dois acessos.
+
 ## Funcionalidades
 
 | Colaborador                              | Administrador                                     |

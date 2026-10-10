@@ -57,9 +57,6 @@ const fail = (res, status, error) => res.status(status).json({ error })
 export function createApp({ databaseUrl, jwtSecret, clientUrl }) {
   if (!databaseUrl || !jwtSecret || jwtSecret.length < 32)
     throw new Error('DATABASE_URL e JWT_SECRET (mínimo de 32 caracteres) são obrigatórios.')
-  const prisma = new PrismaClient({
-    adapter: new PrismaPg({ connectionString: databaseUrl, max: 1 }),
-  })
   const app = express()
   app.disable('x-powered-by')
   app.use(cors({ origin: (clientUrl || 'http://localhost:5173').split(',').map((x) => x.trim()) }))
@@ -92,7 +89,7 @@ export function createApp({ databaseUrl, jwtSecret, clientUrl }) {
     } catch {
       return fail(res, 401, 'Sessão inválida ou expirada. Entre novamente.')
     }
-    const user = await prisma.user.findUnique({ where: { id: payload.sub } })
+    const user = await req.db.user.findUnique({ where: { id: payload.sub } })
     if (!user) return fail(res, 401, 'Usuário não encontrado.')
     req.user = user
     next()
@@ -107,16 +104,31 @@ export function createApp({ databaseUrl, jwtSecret, clientUrl }) {
       expiresIn: '8h',
       algorithm: 'HS256',
     })
-  const getTicket = async (id, user) => {
+  const getTicket = async (id, user, db) => {
     const numericId = Number(id)
     if (!Number.isSafeInteger(numericId) || numericId < 1) return null
-    return prisma.ticket.findFirst({
+    return db.ticket.findFirst({
       where: { id: numericId, ...(user.role === 'ADMIN' ? {} : { requesterId: user.id }) },
       include: includeTicket,
     })
   }
 
   app.get('/api/health', (_req, res) => res.json({ status: 'ok', service: 'helpdesk-ti-api' }))
+  app.use((req, res, next) => {
+    const db = new PrismaClient({
+      adapter: new PrismaPg({ connectionString: databaseUrl, max: 1 }),
+    })
+    req.db = db
+    let closed = false
+    const close = () => {
+      if (closed) return
+      closed = true
+      db.$disconnect().catch(console.error)
+    }
+    res.once('finish', close)
+    res.once('close', close)
+    next()
+  })
   app.post(
     '/api/auth/register',
     asyncRoute(async (req, res) => {
@@ -132,9 +144,9 @@ export function createApp({ databaseUrl, jwtSecret, clientUrl }) {
         return fail(res, 400, 'Confira nome, e-mail e senha (mínimo de 8 caracteres).')
       const { name, password, department } = parsed.data,
         email = parsed.data.email.toLowerCase()
-      if (await prisma.user.findUnique({ where: { email } }))
+      if (await req.db.user.findUnique({ where: { email } }))
         return fail(res, 409, 'Este e-mail já está cadastrado.')
-      const user = await prisma.user.create({
+      const user = await req.db.user.create({
         data: { name, email, department, passwordHash: await bcrypt.hash(password, 12) },
       })
       res.status(201).json({ token: sign(user), user: publicUser(user) })
@@ -147,7 +159,7 @@ export function createApp({ databaseUrl, jwtSecret, clientUrl }) {
         .object({ email: z.string().email(), password: z.string().min(1) })
         .safeParse(req.body)
       if (!parsed.success) return fail(res, 400, 'Informe e-mail e senha válidos.')
-      const user = await prisma.user.findUnique({
+      const user = await req.db.user.findUnique({
         where: { email: parsed.data.email.toLowerCase().trim() },
       })
       if (!user || !(await bcrypt.compare(parsed.data.password, user.passwordHash)))
@@ -164,7 +176,7 @@ export function createApp({ databaseUrl, jwtSecret, clientUrl }) {
         .object({ name: z.string().trim().min(2).max(100), department: z.string().trim().max(80) })
         .safeParse(req.body)
       if (!parsed.success) return fail(res, 400, 'Confira os dados do perfil.')
-      const user = await prisma.user.update({ where: { id: req.user.id }, data: parsed.data })
+      const user = await req.db.user.update({ where: { id: req.user.id }, data: parsed.data })
       res.json(publicUser(user))
     }),
   )
@@ -172,8 +184,8 @@ export function createApp({ databaseUrl, jwtSecret, clientUrl }) {
     '/api/users',
     auth,
     admin,
-    asyncRoute(async (_req, res) => {
-      const users = await prisma.user.findMany({ orderBy: { name: 'asc' } })
+    asyncRoute(async (req, res) => {
+      const users = await req.db.user.findMany({ orderBy: { name: 'asc' } })
       res.json(users.map(publicUser))
     }),
   )
@@ -192,7 +204,7 @@ export function createApp({ databaseUrl, jwtSecret, clientUrl }) {
         .safeParse(req.query)
       if (!parsed.success) return fail(res, 400, 'Filtros inválidos.')
       const { status, priority, category, search } = parsed.data
-      const rows = await prisma.ticket.findMany({
+      const rows = await req.db.ticket.findMany({
         where: {
           ...(req.user.role === 'ADMIN' ? {} : { requesterId: req.user.id }),
           ...(status ? { status } : {}),
@@ -222,7 +234,7 @@ export function createApp({ databaseUrl, jwtSecret, clientUrl }) {
     '/api/tickets/:id',
     auth,
     asyncRoute(async (req, res) => {
-      const ticket = await getTicket(req.params.id, req.user)
+      const ticket = await getTicket(req.params.id, req.user, req.db)
       if (!ticket) return fail(res, 404, 'Chamado não encontrado.')
       res.json(serializeTicket(ticket))
     }),
@@ -241,7 +253,7 @@ export function createApp({ databaseUrl, jwtSecret, clientUrl }) {
         .safeParse(req.body)
       if (!parsed.success)
         return fail(res, 400, 'Confira título, descrição, categoria e prioridade.')
-      const row = await prisma.ticket.create({
+      const row = await req.db.ticket.create({
         data: {
           ...parsed.data,
           requesterId: req.user.id,
@@ -269,7 +281,7 @@ export function createApp({ databaseUrl, jwtSecret, clientUrl }) {
         .safeParse(req.body)
       if (!parsed.success || Object.keys(parsed.data || {}).length === 0)
         return fail(res, 400, 'Dados da atualização inválidos.')
-      const existing = await getTicket(req.params.id, req.user)
+      const existing = await getTicket(req.params.id, req.user, req.db)
       if (!existing) return fail(res, 404, 'Chamado não encontrado.')
       const changes = []
       if (parsed.data.status && parsed.data.status !== existing.status)
@@ -295,7 +307,7 @@ export function createApp({ databaseUrl, jwtSecret, clientUrl }) {
           ? { history: { create: changes.map((action) => ({ action, actorId: req.user.id })) } }
           : {}),
       }
-      const row = await prisma.ticket.update({
+      const row = await req.db.ticket.update({
         where: { id: existing.id },
         data,
         include: includeTicket,
@@ -309,17 +321,17 @@ export function createApp({ databaseUrl, jwtSecret, clientUrl }) {
     asyncRoute(async (req, res) => {
       const parsed = z.object({ body: z.string().trim().min(2).max(5000) }).safeParse(req.body)
       if (!parsed.success) return fail(res, 400, 'A resposta deve ter entre 2 e 5.000 caracteres.')
-      const ticket = await getTicket(req.params.id, req.user)
+      const ticket = await getTicket(req.params.id, req.user, req.db)
       if (!ticket) return fail(res, 404, 'Chamado não encontrado.')
-      const [message] = await prisma.$transaction([
-        prisma.ticketMessage.create({
+      const [message] = await req.db.$transaction([
+        req.db.ticketMessage.create({
           data: { ticketId: ticket.id, authorId: req.user.id, body: parsed.data.body },
           include: { author: true },
         }),
-        prisma.ticketHistory.create({
+        req.db.ticketHistory.create({
           data: { ticketId: ticket.id, actorId: req.user.id, action: 'Nova resposta adicionada' },
         }),
-        prisma.ticket.update({ where: { id: ticket.id }, data: { updatedAt: new Date() } }),
+        req.db.ticket.update({ where: { id: ticket.id }, data: { updatedAt: new Date() } }),
       ])
       res.status(201).json({
         id: message.id,

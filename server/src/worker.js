@@ -3,7 +3,7 @@ import { httpServerHandler } from 'cloudflare:node'
 import { createApp } from './app.js'
 
 const app = createApp({
-  databaseUrl: env.DATABASE_URL,
+  databaseUrl: env.HYPERDRIVE?.connectionString || env.DATABASE_URL,
   jwtSecret: env.JWT_SECRET,
   clientUrl: env.CLIENT_URL,
 })

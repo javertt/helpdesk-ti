@@ -4,8 +4,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("MIGRATION_URL")
 }
 
 enum Role {
@@ -34,17 +35,17 @@ enum TicketStatus {
 }
 
 model User {
-  id                String         @id @default(cuid())
-  name              String
-  email             String         @unique
-  passwordHash      String
-  role              Role           @default(USER)
-  department        String         @default("")
-  createdAt         DateTime       @default(now())
-  requestedTickets  Ticket[]       @relation("Requester")
-  assignedTickets   Ticket[]       @relation("Assignee")
-  messages          TicketMessage[]
-  history           TicketHistory[]
+  id               String          @id @default(cuid())
+  name             String
+  email            String          @unique
+  passwordHash     String
+  role             Role            @default(USER)
+  department       String          @default("")
+  createdAt        DateTime        @default(now())
+  requestedTickets Ticket[]        @relation("Requester")
+  assignedTickets  Ticket[]        @relation("Assignee")
+  messages         TicketMessage[]
+  history          TicketHistory[]
 }
 
 model Ticket {

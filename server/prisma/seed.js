@@ -4,10 +4,10 @@ import { PrismaClient } from '@prisma/client'
 import { PrismaPg } from '@prisma/adapter-pg'
 
 const { MIGRATION_URL, DATABASE_URL, SEED_ADMIN_PASSWORD, SEED_USER_PASSWORD } = process.env
-const seedUrl = MIGRATION_URL || DATABASE_URL
+const seedUrl = DATABASE_URL || MIGRATION_URL
 if (!seedUrl || !SEED_ADMIN_PASSWORD || !SEED_USER_PASSWORD)
   throw new Error(
-    'Defina MIGRATION_URL (ou DATABASE_URL), SEED_ADMIN_PASSWORD e SEED_USER_PASSWORD no server/.env antes do seed.',
+    'Defina DATABASE_URL (ou MIGRATION_URL), SEED_ADMIN_PASSWORD e SEED_USER_PASSWORD no server/.env antes do seed.',
   )
 if (SEED_ADMIN_PASSWORD.length < 12 || SEED_USER_PASSWORD.length < 12)
   throw new Error('As senhas do seed devem ter pelo menos 12 caracteres.')

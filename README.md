@@ -58,6 +58,9 @@ Para restaurar a demonstração, limpe o armazenamento local do site no navegado
 
 1. Crie um projeto no [Supabase](https://supabase.com/dashboard) ou um banco PostgreSQL local. No Supabase, copie as conexões **Session pooler** (porta 5432, para migrations) e **Transaction pooler** (porta 6543, para a API no Worker) no menu `Connect`. Veja a [documentação de conexões](https://supabase.com/docs/guides/database/connecting-to-postgres). Guarde a senha do banco somente no servidor.
 2. Copie `server/.env.example` para `server/.env` e preencha `MIGRATION_URL` com a conexão Session pooler, `DATABASE_URL` com a Transaction pooler, `JWT_SECRET` (32 caracteres ou mais), `SEED_ADMIN_PASSWORD` e `SEED_USER_PASSWORD` com valores próprios. Para PostgreSQL local, `MIGRATION_URL` e `DATABASE_URL` podem ser iguais. As senhas do seed precisam ter 12 caracteres ou mais.
+
+   No Supabase, acrescente `?schema=public&sslmode=require` à conexão de sessão. Para a conexão de transação usada pelo driver `pg`, use `?schema=public&pgbouncer=true&sslmode=require&uselibpqcompat=true`. O parâmetro de compatibilidade mantém o TLS obrigatório no `pg` com a semântica de `sslmode=require` do PostgreSQL.
+
 3. Execute as migrations e os dados fictícios:
 
 ```bash

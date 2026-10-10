@@ -1,6 +1,7 @@
 {
   "name": "helpdesk-ti-api",
   "main": "src/worker.js",
+  "workers_dev": true,
   "compatibility_date": "2026-10-09",
   "compatibility_flags": ["nodejs_compat"],
   "observability": { "enabled": true }

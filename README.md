@@ -32,6 +32,24 @@ Para apresentar o projeto sem compartilhar credenciais do banco, abra a [demonst
 As rotas da API verificam o papel do usuário e limitam os chamados do colaborador ao próprio cadastro. O cadastro público sempre cria o papel `USER`.
 As tabelas do schema `public` têm RLS ativado sem policies para impedir acesso direto pela Data API do Supabase; a API Express usa uma conexão PostgreSQL privada.
 
+### Etapa 1: gestão de chamados
+
+Os chamados reais usam PostgreSQL via Prisma. O backend identifica o usuário pelo JWT validado e o consulta no banco a cada requisição; o `requesterId` enviado pelo navegador não determina o dono. Consultas de detalhes e respostas limitam o acesso ao autor ou a um administrador. Somente administradores podem alterar status, prioridade, responsável e solução. Criação, respostas e mudanças relevantes registram histórico.
+
+A listagem usa `page` (a partir de 1) e `pageSize` (1 a 100; padrão 20). A resposta inclui `items`, `page`, `pageSize`, `total` e `totalPages`. Os filtros são aplicados antes da contagem e da paginação; a ordenação por data e ID mantém a sequência estável. A interface preserva filtros na URL ao mudar de página. A demonstração no navegador usa o mesmo formato, mas continua sendo apenas dados fictícios locais.
+
+Durante a atualização dos dois Workers, chamadas antigas sem `page` nem `pageSize` ainda recebem o formato anterior (lista simples de até 200 chamados). A interface nova sempre envia `page`; esse suporte evita interromper a versão web antiga enquanto a API é publicada primeiro.
+
+As datas são enviadas como ISO 8601 e exibidas no fuso local do navegador. A migration `20261013000000_utc_timestamps` torna explícito o armazenamento em UTC no PostgreSQL (`TIMESTAMPTZ`). **Aplique-a no banco de desenvolvimento antes de rodar a versão nova contra ele.** Não aplique esta migration no projeto publicado sem revisar os dados existentes e planejar a atualização da API.
+
+### Experiência voluntária e galeria
+
+A rota pública `/voluntariado` apresenta a experiência confirmada de Samy Vieira Gomes no Projeto SERPA e os registros enviados por ele. Ela funciona sem login, pode ser aberta pelo menu da central e inclui um caminho de volta ao suporte. As sete imagens ficam em `client/public/voluntariado` como WebP sem metadados; as miniaturas carregam sob demanda e a ampliação permite navegar por teclado. A arte “Introdução à tecnologia” é identificada como material didático, não como foto da turma.
+
+As imagens e legendas estão versionadas em `client/src/data/volunteerPhotos.js`. Para preparar novamente os arquivos a partir dos originais enviados, use `python scripts/prepare-volunteer-photos.py CAMINHO_DAS_FOTOS client/public/voluntariado` com Pillow instalado. Samy confirmou possuir autorização de publicação das pessoas identificáveis nas imagens desta remessa. Para novas fotos com alunos, confirme a autorização antes de publicar; quando necessário, prefira versões recortadas ou com rostos desfocados.
+
+Esta galeria é estática: ainda não há upload, edição ou publicação de fotos pelo painel administrativo. Implementar esses controles exige armazenamento persistente, validação de arquivos e permissões no backend; não use uma rota pública de upload como atalho.
+
 ## Estrutura
 
 ```text
@@ -42,6 +60,8 @@ client/               Interface React e demonstração local
 server/               API Express para Node e Cloudflare Workers
   prisma/             Schema, migration e seed
   src/app.js          Rotas, validação e autorização
+  test/               Testes das rotas com banco de teste em memória
+  scripts/check-db.js Checagem de conexão e tipo da coluna de data
 ```
 
 ## Rodar a interface com dados fictícios
@@ -69,6 +89,8 @@ Para restaurar a demonstração, limpe o armazenamento local do site no navegado
 1. Crie um projeto no [Supabase](https://supabase.com/dashboard) ou um banco PostgreSQL local. No Supabase, copie as conexões **Session pooler** (porta 5432, para migrations), **Transaction pooler** (porta 6543, para a API Node local) e **Direct connection** (para o Hyperdrive) no menu `Connect`. Veja a [documentação de conexões](https://supabase.com/docs/guides/database/connecting-to-postgres). Guarde a senha do banco somente no servidor.
 2. Copie `server/.env.example` para `server/.env` e preencha `MIGRATION_URL` com a conexão Session pooler, `DATABASE_URL` com a Transaction pooler, `JWT_SECRET` (32 caracteres ou mais), `SEED_ADMIN_PASSWORD` e `SEED_USER_PASSWORD` com valores próprios. Para PostgreSQL local, `MIGRATION_URL` e `DATABASE_URL` podem ser iguais. As senhas do seed precisam ter 12 caracteres ou mais.
 
+   Se já existe um `server/.env` neste computador, confira em qual projeto ele aponta antes de executar comandos que escrevem no banco. Para esta etapa, use um banco de desenvolvimento separado da demonstração publicada.
+
    No Supabase, acrescente `?schema=public&sslmode=require` à conexão de sessão. Para a conexão de transação usada pelo driver `pg`, use `?schema=public&pgbouncer=true&sslmode=require&uselibpqcompat=true`. O parâmetro de compatibilidade mantém o TLS obrigatório no `pg` com a semântica de `sslmode=require` do PostgreSQL.
 
 3. Execute as migrations e os dados fictícios:
@@ -90,21 +112,25 @@ A API responde em `http://localhost:3001/api/health`. O seed cria quatro usuári
 
 Para criar uma nova migration após alterar `server/prisma/schema.prisma`, use `npm run db:migrate -w server -- --name nome_da_mudanca` com um banco local de desenvolvimento. Aplique as migrations versionadas no Supabase com `npm run db:deploy -w server`.
 
+`npm run db:check -w server` faz uma consulta somente de leitura para confirmar a tabela e o tipo da coluna `createdAt`. Antes da migration UTC, o tipo é `timestamp without time zone`; depois, `timestamp with time zone`.
+
+Para conferir a Etapa 1 antes de usar o banco, rode `npm test -w server`, `npm run build -w client` e `npm run format:check`. Os testes de rotas usam um banco de teste em memória: verificam validações, dono do chamado, papel administrativo, paginação, respostas e histórico sem modificar o Supabase. Para comprovar a persistência PostgreSQL, use um banco **separado de desenvolvimento**, aplique as migrations, abra um chamado com uma conta de teste, reinicie a API e confira se ele continua na listagem. Não use o banco publicado para testes que criam ou apagam dados.
+
 ## API REST
 
-| Método | Rota                        | Acesso                                                          |
-| ------ | --------------------------- | --------------------------------------------------------------- |
-| GET    | `/api/health`               | Público                                                         |
-| POST   | `/api/auth/register`        | Público                                                         |
-| POST   | `/api/auth/login`           | Público                                                         |
-| GET    | `/api/auth/me`              | Autenticado                                                     |
-| PATCH  | `/api/users/me`             | Autenticado                                                     |
-| GET    | `/api/users`                | Administrador                                                   |
-| GET    | `/api/tickets`              | Autenticado; filtros `status`, `priority`, `category`, `search` |
-| GET    | `/api/tickets/:id`          | Dono do chamado ou administrador                                |
-| POST   | `/api/tickets`              | Autenticado                                                     |
-| PATCH  | `/api/tickets/:id`          | Administrador                                                   |
-| POST   | `/api/tickets/:id/messages` | Dono do chamado ou administrador                                |
+| Método | Rota                        | Acesso                                                                              |
+| ------ | --------------------------- | ----------------------------------------------------------------------------------- |
+| GET    | `/api/health`               | Público                                                                             |
+| POST   | `/api/auth/register`        | Público                                                                             |
+| POST   | `/api/auth/login`           | Público                                                                             |
+| GET    | `/api/auth/me`              | Autenticado                                                                         |
+| PATCH  | `/api/users/me`             | Autenticado                                                                         |
+| GET    | `/api/users`                | Administrador                                                                       |
+| GET    | `/api/tickets`              | Autenticado; filtros `status`, `priority`, `category`, `search`, `page`, `pageSize` |
+| GET    | `/api/tickets/:id`          | Dono do chamado ou administrador                                                    |
+| POST   | `/api/tickets`              | Autenticado                                                                         |
+| PATCH  | `/api/tickets/:id`          | Administrador                                                                       |
+| POST   | `/api/tickets/:id/messages` | Dono do chamado ou administrador                                                    |
 
 Use `Authorization: Bearer <token>` nas rotas autenticadas. O JWT expira em 8 horas. Em produção, configure HTTPS nas duas URLs. Tokens são salvos no armazenamento local do navegador; para um produto de uso real com requisitos de segurança mais altos, use cookies `HttpOnly` e proteção contra abuso no login.
 
@@ -140,6 +166,8 @@ Este projeto usa **dois Cloudflare Workers**: `helpdesk-ti-web` serve os arquivo
 
 O front-end sem `VITE_API_URL` continua em modo demo mesmo quando publicado. O `JWT_SECRET` deve ser único e imprevisível. Não publique `.env`, senhas nem a string de conexão no GitHub. Os planos gratuitos têm limites de uso que podem mudar; confirme os limites atuais nos painéis dos provedores antes de aumentar o tráfego.
 
+Em outubro de 2026, a documentação informa [100 mil requisições por dia no Workers Free](https://developers.cloudflare.com/workers/platform/limits/), [100 mil consultas por dia no Hyperdrive Free](https://developers.cloudflare.com/hyperdrive/platform/pricing/) e [500 MB de banco no Supabase Free](https://supabase.com/docs/guides/platform/database-size). O [Supabase pode pausar projetos gratuitos pouco ativos](https://supabase.com/docs/guides/platform/free-project-pausing); por isso esta demonstração não promete disponibilidade contínua. Nenhum serviço pago é necessário para a etapa atual.
+
 ## Qualidade e acessibilidade
 
 - Layout responsivo, navegação por teclado e contraste em badges e controles.
@@ -149,3 +177,18 @@ O front-end sem `VITE_API_URL` continua em modo demo mesmo quando publicado. O `
 - Dados de demonstração inteiramente fictícios.
 
 **Nota:** Equipamentos é uma página de apresentação do módulo futuro. Para problemas com dispositivos, já é possível criar chamados da categoria Hardware. A página de Configurações apresenta o funcionamento atual da central.
+
+## Limitações e próximas etapas
+
+- O painel resume somente os 100 chamados mais recentes; a tela **Chamados** permite percorrer todos. Métricas agregadas para bases maiores ficam para uma melhoria futura.
+- O modo demo no `localStorage` não oferece segurança nem persistência compartilhada. Para dados reais, configure a API e o PostgreSQL.
+- O JWT fica no armazenamento local do navegador. Para produção com usuários reais, revisar sessão, proteção contra abuso e política de senhas.
+- A página de experiência voluntária e a galeria estática foram adicionadas nesta rodada. O gerenciamento das fotos pelo painel, a base de conhecimento e o assistente de IA permanecem para etapas seguintes.
+- O desenvolvimento recebeu apoio de IA para análise, implementação e testes; as decisões e verificações devem ser revisadas e explicadas por quem apresenta o projeto.
+
+## Plano de evolução
+
+1. **Chamados:** validação, permissões, persistência, paginação e histórico; esta rodada cobre o código e os testes automatizados. Falta validar escrita e leitura após reinício em um PostgreSQL de desenvolvimento isolado.
+2. **Tecnologia e inclusão digital:** página pública e galeria com os registros fornecidos, implementadas. O próximo incremento é o gerenciamento seguro das fotos pelo painel, com armazenamento persistente.
+3. **Base de conhecimento:** artigos publicados, pesquisa e ligação com a abertura de chamados.
+4. **Assistente de IA:** orientação apoiada nos artigos e sugestões editáveis para chamados, com fallback quando a API estiver indisponível.

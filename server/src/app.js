@@ -54,8 +54,8 @@ const serializeTicket = (t) => ({
 const asyncRoute = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next)
 const fail = (res, status, error) => res.status(status).json({ error })
 
-export function createApp({ databaseUrl, jwtSecret, clientUrl }) {
-  if (!databaseUrl || !jwtSecret || jwtSecret.length < 32)
+export function createApp({ databaseUrl, jwtSecret, clientUrl, databaseFactory }) {
+  if ((!databaseUrl && !databaseFactory) || !jwtSecret || jwtSecret.length < 32)
     throw new Error('DATABASE_URL e JWT_SECRET (mínimo de 32 caracteres) são obrigatórios.')
   const app = express()
   app.disable('x-powered-by')
@@ -116,16 +116,16 @@ export function createApp({ databaseUrl, jwtSecret, clientUrl }) {
   app.get('/api/health', (_req, res) => res.json({ status: 'ok', service: 'helpdesk-ti-api' }))
   app.use((req, res, next) => {
     const connectionString = typeof databaseUrl === 'function' ? databaseUrl() : databaseUrl
-    if (!connectionString) return next(new Error('DATABASE_URL ausente.'))
-    const db = new PrismaClient({
-      adapter: new PrismaPg({ connectionString, max: 1 }),
-    })
+    if (!connectionString && !databaseFactory) return next(new Error('DATABASE_URL ausente.'))
+    const db = databaseFactory
+      ? databaseFactory()
+      : new PrismaClient({ adapter: new PrismaPg({ connectionString, max: 1 }) })
     req.db = db
     let closed = false
     const close = () => {
       if (closed) return
       closed = true
-      db.$disconnect().catch(console.error)
+      if (db.$disconnect) db.$disconnect().catch(console.error)
     }
     res.once('finish', close)
     res.once('close', close)
@@ -202,34 +202,47 @@ export function createApp({ databaseUrl, jwtSecret, clientUrl }) {
           priority: z.enum(['BAIXA', 'MEDIA', 'URGENTE']).optional(),
           category: z.enum(['REDE', 'HARDWARE', 'SOFTWARE', 'ACESSOS', 'OUTRO']).optional(),
           search: z.string().max(120).optional(),
+          page: z.coerce.number().int().min(1).max(100000).default(1),
+          pageSize: z.coerce.number().int().min(1).max(100).default(20),
         })
         .safeParse(req.query)
       if (!parsed.success) return fail(res, 400, 'Filtros inválidos.')
-      const { status, priority, category, search } = parsed.data
+      const { status, priority, category, search, page, pageSize } = parsed.data
+      const legacyResponse = req.query.page === undefined && req.query.pageSize === undefined
+      const where = {
+        ...(req.user.role === 'ADMIN' ? {} : { requesterId: req.user.id }),
+        ...(status ? { status } : {}),
+        ...(priority ? { priority } : {}),
+        ...(category ? { category } : {}),
+        ...(search
+          ? {
+              OR: [
+                { title: { contains: search, mode: 'insensitive' } },
+                { requester: { name: { contains: search, mode: 'insensitive' } } },
+                ...(Number.isSafeInteger(Number(search.replace(/^#?HD-/i, ''))) &&
+                /^#?HD-\d+$/i.test(search)
+                  ? [{ id: Number(search.replace(/^#?HD-/i, '')) }]
+                  : []),
+              ],
+            }
+          : {}),
+      }
+      const total = legacyResponse ? null : await req.db.ticket.count({ where })
       const rows = await req.db.ticket.findMany({
-        where: {
-          ...(req.user.role === 'ADMIN' ? {} : { requesterId: req.user.id }),
-          ...(status ? { status } : {}),
-          ...(priority ? { priority } : {}),
-          ...(category ? { category } : {}),
-          ...(search
-            ? {
-                OR: [
-                  { title: { contains: search, mode: 'insensitive' } },
-                  { requester: { name: { contains: search, mode: 'insensitive' } } },
-                  ...(Number.isSafeInteger(Number(search.replace(/^#?HD-/i, ''))) &&
-                  /^#?HD-\d+$/i.test(search)
-                    ? [{ id: Number(search.replace(/^#?HD-/i, '')) }]
-                    : []),
-                ],
-              }
-            : {}),
-        },
-        include: includeTicket,
-        orderBy: { createdAt: 'desc' },
-        take: 200,
+        where,
+        include: { requester: true, assignee: true },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        skip: legacyResponse ? 0 : (page - 1) * pageSize,
+        take: legacyResponse ? 200 : pageSize,
       })
-      res.json(rows.map(serializeTicket))
+      if (legacyResponse) return res.json(rows.map(serializeTicket))
+      res.json({
+        items: rows.map(serializeTicket),
+        page,
+        pageSize,
+        total,
+        totalPages: Math.ceil(total / pageSize),
+      })
     }),
   )
   app.get(

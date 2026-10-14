@@ -41,7 +41,7 @@ model User {
   passwordHash     String
   role             Role            @default(USER)
   department       String          @default("")
-  createdAt        DateTime        @default(now())
+  createdAt        DateTime        @default(now()) @db.Timestamptz(3)
   requestedTickets Ticket[]        @relation("Requester")
   assignedTickets  Ticket[]        @relation("Assignee")
   messages         TicketMessage[]
@@ -56,9 +56,9 @@ model Ticket {
   priority    TicketPriority  @default(MEDIA)
   status      TicketStatus    @default(ABERTO)
   solution    String          @default("") @db.Text
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
-  resolvedAt  DateTime?
+  createdAt   DateTime        @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime        @updatedAt @db.Timestamptz(3)
+  resolvedAt  DateTime?       @db.Timestamptz(3)
   requesterId String
   assigneeId  String?
   requester   User            @relation("Requester", fields: [requesterId], references: [id])
@@ -74,7 +74,7 @@ model Ticket {
 model TicketMessage {
   id        String   @id @default(cuid())
   body      String   @db.Text
-  createdAt DateTime @default(now())
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
   ticketId  Int
   authorId  String
   ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
@@ -86,7 +86,7 @@ model TicketMessage {
 model TicketHistory {
   id        String   @id @default(cuid())
   action    String
-  createdAt DateTime @default(now())
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
   ticketId  Int
   actorId   String
   ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)

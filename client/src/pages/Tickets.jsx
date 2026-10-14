@@ -7,24 +7,28 @@ import TicketTable from '../components/TicketTable'
 
 export default function Tickets({ user }) {
   const [params, setParams] = useSearchParams(),
-    [tickets, setTickets] = useState(null),
+    [result, setResult] = useState(null),
     [error, setError] = useState(''),
     [search, setSearch] = useState(params.get('search') || '')
   const status = params.get('status') || 'TODOS',
     priority = params.get('priority') || 'TODOS',
-    category = params.get('category') || 'TODOS'
+    category = params.get('category') || 'TODOS',
+    page = Number(params.get('page')) || 1
   const setFilter = (key, value) => {
     const next = new URLSearchParams(params)
     value === 'TODOS' || !value ? next.delete(key) : next.set(key, value)
+    if (key !== 'page') next.delete('page')
     setParams(next)
   }
   useEffect(() => {
     let active = true
+    setResult(null)
+    setError('')
     api
-      .tickets({ status, priority, category, search: params.get('search') || '' })
+      .ticketPage({ status, priority, category, search: params.get('search') || '', page })
       .then((x) => {
         if (active) {
-          setTickets(x)
+          setResult(x)
           setError('')
         }
       })
@@ -32,7 +36,7 @@ export default function Tickets({ user }) {
     return () => {
       active = false
     }
-  }, [status, priority, category, params])
+  }, [status, priority, category, params, page])
   return (
     <>
       <section className="page-heading">
@@ -61,8 +65,8 @@ export default function Tickets({ user }) {
             <div>
               <h2>Todos os chamados</h2>
               <p>
-                {tickets
-                  ? `${tickets.length} ${tickets.length === 1 ? 'solicitação encontrada' : 'solicitações encontradas'}`
+                {result
+                  ? `${result.total} ${result.total === 1 ? 'solicitação encontrada' : 'solicitações encontradas'}`
                   : 'Carregando...'}
               </p>
             </div>
@@ -127,7 +131,34 @@ export default function Tickets({ user }) {
             </button>
           )}
         </div>
-        {tickets ? <TicketTable tickets={tickets} /> : !error && <Loading />}
+        {result ? (
+          <>
+            <TicketTable tickets={result.items} />
+            {result.totalPages > 1 && (
+              <nav className="pagination" aria-label="Páginas de chamados">
+                <button
+                  type="button"
+                  disabled={page <= 1}
+                  onClick={() => setFilter('page', String(page - 1))}
+                >
+                  Anterior
+                </button>
+                <span>
+                  Página {page} de {result.totalPages}
+                </span>
+                <button
+                  type="button"
+                  disabled={page >= result.totalPages}
+                  onClick={() => setFilter('page', String(page + 1))}
+                >
+                  Próxima
+                </button>
+              </nav>
+            )}
+          </>
+        ) : (
+          !error && <Loading />
+        )}
       </section>
     </>
   )

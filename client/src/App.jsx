@@ -8,6 +8,7 @@ import NewTicket from './pages/NewTicket'
 import TicketDetail from './pages/TicketDetail'
 import Profile from './pages/Profile'
 import Auth from './pages/Auth'
+import Volunteer from './pages/Volunteer'
 import { Equipment, UsersPage, SettingsPage } from './pages/Secondary'
 
 export default function App() {
@@ -30,6 +31,7 @@ export default function App() {
   }
   return (
     <Routes>
+      <Route path="/voluntariado" element={<Volunteer />} />
       <Route
         path="/login"
         element={

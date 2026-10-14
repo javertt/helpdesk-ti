@@ -10,6 +10,8 @@
     "db:deploy": "prisma migrate deploy",
     "db:seed": "node prisma/seed.js",
     "db:generate": "prisma generate",
+    "db:check": "node scripts/check-db.js",
+    "test": "node --test test/tickets.test.js",
     "deploy": "wrangler deploy",
     "deploy:dry": "wrangler deploy --dry-run"
   },

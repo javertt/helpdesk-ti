@@ -120,7 +120,7 @@ export const api = {
     write(K.session, { ...read(K.session, {}), user })
     return user
   },
-  async tickets(filters = {}) {
+  async ticketPage(filters = {}) {
     if (!isDemo)
       return request(
         `/tickets?${new URLSearchParams(Object.entries(filters).filter(([, v]) => v && v !== 'TODOS')).toString()}`,
@@ -141,7 +141,22 @@ export const api = {
           .toLowerCase()
           .includes(filters.search.toLowerCase()),
       )
-    return rows.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+    rows.sort(
+      (a, b) => new Date(b.createdAt) - new Date(a.createdAt) || Number(b.id) - Number(a.id),
+    )
+    const page = Number(filters.page) || 1
+    const pageSize = Number(filters.pageSize) || 20
+    return {
+      items: rows.slice((page - 1) * pageSize, page * pageSize),
+      page,
+      pageSize,
+      total: rows.length,
+      totalPages: Math.ceil(rows.length / pageSize),
+    }
+  },
+  async tickets(filters = {}) {
+    const result = await this.ticketPage({ ...filters, page: 1, pageSize: 100 })
+    return result.items
   },
   async ticket(id) {
     if (!isDemo) return request(`/tickets/${id}`)

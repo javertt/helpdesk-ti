@@ -201,6 +201,7 @@ export default function Auth({ mode, onAuth }) {
         </div>
         <div className="auth-form-footer">
           © {new Date().getFullYear()} HelpDesk TI · Feito para simplificar.
+          <Link to="/voluntariado">Tecnologia e inclusão digital</Link>
           <a
             href="https://linktree.samy-vgomes.workers.dev/javertt"
             target="_blank"

@@ -16,6 +16,7 @@ import {
   CircleHelp,
   Sparkles,
   UserRound,
+  HeartHandshake,
 } from 'lucide-react'
 import { Avatar } from './UI'
 import { hasLiveApi, isDemo } from '../lib/api'
@@ -23,6 +24,7 @@ import { hasLiveApi, isDemo } from '../lib/api'
 const nav = [
   { to: '/', label: 'Painel', icon: LayoutDashboard, admin: true },
   { to: '/chamados', label: 'Chamados', icon: Ticket },
+  { to: '/voluntariado', label: 'Experiência voluntária', icon: HeartHandshake },
   { to: '/equipamentos', label: 'Equipamentos', icon: Monitor, admin: true },
   { to: '/usuarios', label: 'Usuários', icon: Users, admin: true },
   { to: '/configuracoes', label: 'Configurações', icon: Settings, admin: true },

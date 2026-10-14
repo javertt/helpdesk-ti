@@ -1,0 +1,65 @@
+const asset = '/voluntariado/'
+
+export const volunteerPhotos = [
+  {
+    id: 'turma-em-atividade',
+    title: 'Atividade prática na sala',
+    caption: 'Participantes usam notebooks durante uma atividade de informática.',
+    alt: 'Pessoas reunidas em mesas com notebooks durante uma atividade.',
+    width: 640,
+    height: 640,
+  },
+  {
+    id: 'sala-de-informatica',
+    title: 'Espaço das aulas',
+    caption: 'Sala organizada com notebooks e cadeiras para as atividades.',
+    alt: 'Sala com notebooks sobre mesas azuis e cadeiras dispostas para uma aula.',
+    width: 899,
+    height: 1599,
+  },
+  {
+    id: 'atividade-no-quadro',
+    title: 'Atividade no quadro',
+    caption: 'Registro de uma atividade no quadro, com notebooks preparados na sala.',
+    alt: 'Pessoa diante do quadro branco; notebooks estão organizados nas mesas.',
+    width: 899,
+    height: 1599,
+  },
+  {
+    id: 'grupo-da-turma',
+    title: 'Registro coletivo',
+    caption: 'Participantes reunidos em um registro da turma.',
+    alt: 'Grupo de participantes reunidos para uma foto coletiva.',
+    width: 1032,
+    height: 774,
+  },
+  {
+    id: 'notebooks-organizados',
+    title: 'Equipamentos das atividades',
+    caption: 'Notebooks guardados no espaço utilizado para as aulas.',
+    alt: 'Notebooks embalados e organizados em um armário.',
+    width: 899,
+    height: 1599,
+  },
+  {
+    id: 'projecao-em-aula',
+    title: 'Espaço de projeção',
+    caption: 'Projetor montado em uma sala com mesas e cadeiras.',
+    alt: 'Tela projetada ao fundo de uma sala escura com mesas e cadeiras.',
+    width: 899,
+    height: 1599,
+  },
+  {
+    id: 'material-aula-1',
+    title: 'Material de aula',
+    caption: 'Arte didática intitulada “Introdução à tecnologia”.',
+    alt: 'Arte didática com o texto Introdução à tecnologia e Conexão.',
+    width: 1536,
+    height: 1024,
+    material: true,
+  },
+].map((photo) => ({
+  ...photo,
+  src: `${asset}${photo.id}.webp`,
+  thumbnail: `${asset}${photo.id}-thumb.webp`,
+}))

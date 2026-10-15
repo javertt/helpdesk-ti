@@ -59,7 +59,7 @@ export default function Volunteer() {
     <div className="volunteer-page">
       <header className="volunteer-header">
         <Link className="volunteer-brand" to="/voluntariado">
-          helpdesk<span>ti</span>
+          Professor <span>voluntário</span>
         </Link>
         <nav aria-label="Navegação da experiência voluntária">
           <a
@@ -83,6 +83,7 @@ export default function Volunteer() {
             Sou Samy Vieira Gomes. Atuei como professor voluntário de informática no Projeto SERPA,
             ensinando mais de 40 alunos ao longo de mais de um ano.
           </p>
+          <p>O curso também tem foco no público idoso, com aulas de tecnologia acessíveis.</p>
           <div className="volunteer-facts" aria-label="Resumo da experiência">
             <div>
               <strong>Mais de 1 ano</strong>
